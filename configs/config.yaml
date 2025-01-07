@@ -33,6 +33,6 @@ excel_path: '/root/code/MRIclass/datasets/SLN_WCH_final version_new.xlsx'
 
 sample_batch_size: 1
 sample_global_seed: 25126
-sample_ckpt_path: "/root/code/MRIclass/results/000-ViT3D-S-8/checkpoints/0060000.pt"
+sample_ckpt_path: "/root/code/MRIclass/results/007-ViT3D-S-8/checkpoints/0005000.pt"
 use_ema: False
 test_npy_dir: '/root/code/MRIclass/datasets/test/'  

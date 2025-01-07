@@ -77,11 +77,11 @@ def main(config):
 
 
     auroc_metric = MulticlassAUROC(num_classes=2, average='none').to(device)
-    accuracy_metric = MulticlassAccuracy(num_classes=2, average='weighted').to(device)
+    accuracy_metric = MulticlassAccuracy(num_classes=2, average='none').to(device)
     item = 0
     for slice3D_data in test_loader:
         item += 1
-        if item == 30:
+        if item == 100:
             break
         x = slice3D_data[0].to(device, non_blocking=True)
         y = slice3D_data[1].to(device, non_blocking=True)
