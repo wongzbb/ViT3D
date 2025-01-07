@@ -1,0 +1,11 @@
+__pycache__/
+wandb/
+results/
+data/
+SLN_internal_data/
+SLN_internal_mask/
+test/
+train/
+SLN_WCH_final version_new.xlsx
+load.py
+.codegpt

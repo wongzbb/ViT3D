@@ -1,0 +1,38 @@
+global_seed: 25126
+global_batch_size: 1
+epochs: 1000
+results_dir: "results"
+lr: 0.0001
+weight_decay: 0
+autocast: False
+model: "ViT3D-S/8"
+num_workers: 4
+ckpt_every: 5000
+
+num_frames: 120
+
+img_size: 128
+
+#load from pretrain checkpoint
+init_from_pretrain_ckpt: False
+pretrain_ckpt_path: ""
+
+use_compiler: False
+
+wandb: False
+
+use_clip_norm: False
+start_clip_epoch: 100
+
+accumulation_steps: 1
+
+log_every: 10
+
+train_npy_dir: '/root/code/MRIclass/datasets/train/'  
+excel_path: '/root/code/MRIclass/datasets/SLN_WCH_final version_new.xlsx'   
+
+sample_batch_size: 1
+sample_global_seed: 25126
+sample_ckpt_path: "/root/code/MRIclass/results/000-ViT3D-S-8/checkpoints/0060000.pt"
+use_ema: False
+test_npy_dir: '/root/code/MRIclass/datasets/test/'  
