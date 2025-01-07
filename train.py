@@ -116,7 +116,12 @@ def main(config):
 
     
     transform = Resize4D(out_size=(config.img_size, config.img_size))
-    train_dataset = NpyDataset(config.train_npy_dir, config.excel_path, transform=transform, num_frames=config.num_frames)
+
+    if config.oversampled:
+        train_dataset = NpyDataset(config.train_npy_dir, config.excel_path, transform=transform, num_frames=config.num_frames, oversampled=True)
+    else:
+        train_dataset = NpyDataset(config.train_npy_dir, config.excel_path, transform=transform, num_frames=config.num_frames)
+
 
     # targets_ = [sample[1] for sample in train_dataset]
     # class_counts = np.bincount(targets_) 
@@ -165,7 +170,7 @@ def main(config):
     if rank == 0:
         logger.info(f"Training for {config.epochs} epochs...")
 
-
+    class_weights = torch.tensor([1.0, 4.0]).to(device)
 
     for epoch in range(config.epochs):
         sampler.set_epoch(epoch)
@@ -189,10 +194,17 @@ def main(config):
 
             # total_loss_dick = F.cross_entropy(logits, y)
             # total_loss = total_loss_dick.mean()
-            y_one_hot = F.one_hot(y, num_classes=2).float()
-            # total_loss = F.cross_entropy(logits, y)
+            # y_one_hot = F.one_hot(y, num_classes=2).float()
+            
 
-            total_loss = sigmoid_focal_loss(logits, y_one_hot, alpha=0.25, gamma=2, reduction='mean')
+            if config.use_focal_loss:
+                y_one_hot = F.one_hot(y, num_classes=2).float()
+                total_loss = sigmoid_focal_loss(logits, y_one_hot, alpha=0.25, gamma=2, reduction='mean')
+            else:
+                total_loss = F.cross_entropy(logits, y, weight=class_weights)
+
+
+            # total_loss = sigmoid_focal_loss(logits, y_one_hot, alpha=0.75, gamma=10, reduction='mean')
 
             if rank == 0 and config.wandb:
                 wandb.log({"loss": total_loss.item()})

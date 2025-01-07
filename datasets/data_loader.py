@@ -12,6 +12,7 @@ import random
 from scipy.ndimage import rotate
 import torch.nn.functional as F
 import math
+from collections import defaultdict
 
 n_cpu = os.cpu_count()
 global_seed = 0
@@ -49,7 +50,7 @@ class Resize4D:
 
 
 class NpyDataset(Dataset):
-    def __init__(self, npy_dir, excel_path, transform=None, num_frames=120):
+    def __init__(self, npy_dir, excel_path, transform=None, num_frames=120, oversampled=False):
         self.npy_dir = npy_dir
         self.transform = transform
         self.df = pd.read_excel(excel_path)
@@ -93,6 +94,39 @@ class NpyDataset(Dataset):
 
         # if not self.data_labels:
         #     raise ValueError("没有找到任何匹配的 .npy 文件和标签。")
+
+        if oversampled:
+            label_counts = defaultdict(int)
+            for _, label in self.data_labels:
+                label_counts[label] += 1
+            num_label_0 = label_counts[0]
+            num_label_1 = label_counts[1]
+
+            print(f"num_label_0: {num_label_0}, num_label_1: {num_label_1}")
+
+            oversample_ratio = num_label_0 // num_label_1
+            remainder = num_label_0 % num_label_1
+
+            oversampled_data = []
+            for file, label in self.data_labels:
+                if label == 1:
+                    oversampled_data.extend([(file, label)] * (oversample_ratio-1))
+                    if remainder > 0:
+                        oversampled_data.append((file, label))
+                        remainder -= 1
+
+            print(f"oversampled_data: {len(oversampled_data)}")
+
+            self.data_labels.extend(oversampled_data)
+
+            random.shuffle(self.data_labels)
+
+            # new_label_counts = defaultdict(int)
+            # for _, label in self.data_labels:
+            #     new_label_counts[label] += 1
+
+            # print("过采样后的类别分布:", new_label_counts)
+
 
 
     def __len__(self):
@@ -187,7 +221,7 @@ class DistributedWeightedSampler(Sampler):
 
 def create_data_loader(npy_dir, excel_path, batch_size=32, shuffle=True, num_workers=4):
     transform = Resize4D(out_size=(256, 256))
-    dataset = NpyDataset(npy_dir, excel_path, transform=transform)
+    dataset = NpyDataset(npy_dir, excel_path, transform=transform, oversampled=True)
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
     return data_loader
 
