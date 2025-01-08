@@ -6,6 +6,10 @@ SLN_internal_data/
 SLN_internal_mask/
 test/
 train/
+mask/
+data_non/
+mask_/
+mask_npy/
 SLN_WCH_final version_new.xlsx
 load.py
 .codegpt

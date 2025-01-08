@@ -72,11 +72,15 @@ def main(config):
     if rank == 0:
         logger.info(f"Dataset contains {len(test_dataset)}.")
 
-    model.train()  # important! This enables embedding dropout for classifier-free guidance
+    model.eval()  # important! This enables embedding dropout for classifier-free guidance
 
 
-    auroc_metric = MulticlassAUROC(num_classes=2, average='macro').to(device)
-    accuracy_metric = MulticlassAccuracy(num_classes=2, average='macro').to(device)
+    auroc_metric = MulticlassAUROC(num_classes=2, average='none').to(device)
+    accuracy_metric = MulticlassAccuracy(num_classes=2, average='none').to(device)
+
+    auroc_metric1 = MulticlassAUROC(num_classes=2, average='weighted').to(device)
+    accuracy_metric1 = MulticlassAccuracy(num_classes=2, average='weighted').to(device)
+
     item = 0
     for slice3D_data in test_loader:
         item += 1
@@ -98,6 +102,9 @@ def main(config):
         auroc_metric.update(logits, y)
         accuracy_metric.update(logits, y)
 
+        auroc_metric1.update(logits, y)
+        accuracy_metric1.update(logits, y)
+
         logger.info(f"item: {item}, logits: {logits}, Labels: {y}")
 
         # del logits
@@ -106,8 +113,14 @@ def main(config):
     auroc_score = auroc_metric.compute()
     accuracy_score = accuracy_metric.compute()
 
+    auroc_score1 = auroc_metric1.compute()
+    accuracy_score1 = accuracy_metric1.compute()
+
     print(f"AUROC: {auroc_score}")
     print(f"Accuracy: {accuracy_score}")
+
+    print(f"AUROC_weight: {auroc_score1}")
+    print(f"Accuracy_weight: {accuracy_score1}")
 
     logger.info("Done!")
     cleanup()

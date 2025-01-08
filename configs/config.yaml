@@ -1,3 +1,6 @@
+use_mask: True
+oversampled: True
+
 global_seed: 25126
 global_batch_size: 2
 epochs: 1000
@@ -7,11 +10,11 @@ weight_decay: 1e-5
 autocast: False
 model: "ViT3D-S/8"
 num_workers: 4
-ckpt_every: 5000
+ckpt_every: 2000
 
-num_frames: 92  #max 120
+num_frames: 200  #max 120
 
-img_size: 196
+img_size: 128
 
 #load from pretrain checkpoint
 init_from_pretrain_ckpt: False
@@ -20,7 +23,6 @@ pretrain_ckpt_path: ""
 use_compiler: False
 
 wandb: False
-oversampled: True
 
 use_clip_norm: False
 start_clip_epoch: 100
@@ -32,10 +34,14 @@ use_focal_loss: True
 log_every: 10
 
 train_npy_dir: '/root/code/MRIclass/datasets/train/'  
+
 excel_path: '/root/code/MRIclass/datasets/SLN_WCH_final version_new.xlsx'   
 
 sample_batch_size: 1
 sample_global_seed: 25126
-sample_ckpt_path: "/root/code/MRIclass/results/000-ViT3D-S-8/checkpoints/0035000.pt"
+sample_ckpt_path: "/root/code/MRIclass/results/000-ViT3D-S-8/checkpoints/0025000.pt"
 use_ema: False
 test_npy_dir: '/root/code/MRIclass/datasets/test/'  
+
+
+mask_dir: '/root/code/MRIclass/datasets/mask_npy/'

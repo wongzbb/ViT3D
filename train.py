@@ -117,28 +117,7 @@ def main(config):
     
     transform = Resize4D(out_size=(config.img_size, config.img_size))
 
-    if config.oversampled:
-        train_dataset = NpyDataset(config.train_npy_dir, config.excel_path, transform=transform, num_frames=config.num_frames, oversampled=True)
-    else:
-        train_dataset = NpyDataset(config.train_npy_dir, config.excel_path, transform=transform, num_frames=config.num_frames)
-
-    test_dataset = NpyDataset(config.test_npy_dir, config.excel_path, transform=transform, num_frames=config.num_frames)
-    # targets_ = [sample[1] for sample in train_dataset]
-    # class_counts = np.bincount(targets_) 
-    # total_count = len(targets_)
-    # weights = []
-    # print(class_counts)
-    # for lbl in targets_:
-    #     weight_for_lbl = total_count / class_counts[lbl]
-    #     weights.append(weight_for_lbl)
-
-    # sampler = DistributedWeightedSampler(
-    #     dataset=train_dataset,
-    #     weights=weights,
-    #     num_replicas=dist.get_world_size(),
-    #     rank=dist.get_rank(),
-    #     replacement=True,
-    # )
+    train_dataset = NpyDataset(config.train_npy_dir, config.mask_dir, config.excel_path, transform=transform, num_frames=config.num_frames, oversampled=config.oversampled, use_mask=config.use_mask)
 
     sampler=get_sampler(train_dataset)
 
@@ -185,6 +164,7 @@ def main(config):
             x = x.to(device)
             y = y.to(device)
             # mask = slice3D_data['mask'].to(device, non_blocking=True)
+            # print(x.shape)
 
             # print(x.shape)
 

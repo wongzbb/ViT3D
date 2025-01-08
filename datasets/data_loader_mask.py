@@ -18,25 +18,6 @@ from einops import rearrange
 n_cpu = os.cpu_count()
 global_seed = 0
 
-
-# def random_flip(data):
-#     axes = [2, 3] 
-#     for axis in axes:
-#         if random.random() > 0.5:
-#             data = np.flip(data, axis=axis).copy()
-#     return data
-# def random_rotate(data, degrees=10):
-#     angle = random.uniform(-degrees, degrees)
-#     data = rotate(data, angle, axes=(1, 2), reshape=False, order=1, mode='constant', cval=0)
-#     angle = random.uniform(-degrees, degrees)
-#     data = rotate(data, angle, axes=(1, 3), reshape=False, order=1, mode='constant', cval=0)
-#     return data
-# def random_add_noise(data, noise_level=0.1):
-#     noise = np.random.randn(*data.shape) * noise_level
-#     data = data + noise
-#     data = np.clip(data, -1, 1)
-#     return data
-
 class Resize4D:
     def __init__(self, out_size=(256, 256)):
         self.out_size = out_size
@@ -51,11 +32,10 @@ class Resize4D:
 
 
 class NpyDataset(Dataset):
-    def __init__(self, npy_dir, mask_dir, excel_path, transform=None, num_frames=120, oversampled=False, use_mask=False):
+    def __init__(self, npy_dir, mask_dir, excel_path, transform=None, num_frames=120, oversampled=False):
         self.npy_dir = npy_dir
         self.mask_dir = mask_dir
         self.transform = transform
-        self.use_mask = use_mask
         self.df = pd.read_excel(excel_path)
 
         self.id_col = '患者编号'  
@@ -139,15 +119,29 @@ class NpyDataset(Dataset):
 
         file_path, label = self.data_labels[idx]
         data = np.load(file_path)
+
+        mask_path = file_path.replace(self.npy_dir, self.mask_dir)
+        mask = np.load(mask_path)
+
+        # data = self.normalize_data(data)
+
         if data.ndim == 3:
             data = np.expand_dims(data, axis=0)  #  (1, H, W, D)
         elif data.ndim == 4:
             data = data  
+        if mask.ndim == 3:
+            mask = np.expand_dims(mask, axis=0)  #  (1, H, W, D)
+        elif mask.ndim == 4:
+            mask = mask  
+
         data = data.transpose(0, 3, 1, 2)  # TorchIO expects (C, D, H, W)
+        mask = mask.transpose(0, 3, 1, 2)  # TorchIO expects (C, D, H, W)
+
         data = torch.from_numpy(data).float()
+        mask = torch.from_numpy(mask).float()
         if self.transform:
             data = self.transform(data)
-        data = rearrange(data, 'c d h w -> d c h w')
+            mask = self.transform(mask)
 
         # subject = tio.Subject(
         #     image=tio.ScalarImage(tensor=data)  # TorchIO expects (C, D, H, W)
@@ -160,31 +154,14 @@ class NpyDataset(Dataset):
         # augmented_data = augmented_data.unsqueeze(1)
         # # print(f"augmented_data.shape: {augmented_data.shape}")
 
-        if self.use_mask:
-            mask_path = file_path.replace(self.npy_dir, self.mask_dir)
-            mask = np.load(mask_path)
-            if mask.ndim == 3:
-                mask = np.expand_dims(mask, axis=0)  #  (1, H, W, D)
-            elif mask.ndim == 4:
-                mask = mask
-            mask = mask.transpose(0, 3, 1, 2)  # TorchIO expects (C, D, H, W)
-            mask = torch.from_numpy(mask).float()
-            if self.transform:
-                mask = self.transform(mask)
-            mask = rearrange(mask, 'c d h w -> d c h w')
-
 
         label = torch.tensor(label).long() 
 
-        if self.use_mask:
-            ll = (120 - self.num_frames // 2) // 2
-        else:
-            ll = (120 - self.num_frames) // 2
+        data = rearrange(data, 'c d h w -> d c h w')
+        mask = rearrange(mask, 'c d h w -> d c h w')
 
-        if self.use_mask:
-            return torch.cat((data[ll:120-ll,:,:,:], mask[ll:120-ll,:,:,:]), dim=0), label
-        else:
-            return data[ll:120-ll,:,:,:], label
+        ll = (120 - self.num_frames) // 2
+        return data[ll:120-ll,:,:,:], mask[ll:120-ll,:,:,:], label
 
     def normalize_data(self, data):
         data_min = np.min(data)
@@ -239,21 +216,22 @@ class DistributedWeightedSampler(Sampler):
     def __len__(self):
         return math.ceil(self.num_samples / self.num_replicas)
 
-def create_data_loader(npy_dir, excel_path, batch_size=32, shuffle=True, num_workers=4):
+def create_data_loader(npy_dir, mask_dir, excel_path, batch_size=32, shuffle=True, num_workers=4):
     transform = Resize4D(out_size=(256, 256))
-    dataset = NpyDataset(npy_dir, excel_path, transform=transform, oversampled=True, use_mask=False)
+    dataset = NpyDataset(npy_dir, mask_dir, excel_path, transform=transform, oversampled=True)
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
     return data_loader
 
 if __name__ == "__main__":
     source_directory = '/root/code/MRIclass/datasets/train/'   
+    mask_directory = '/root/code/MRIclass/datasets/mask_npy/'   
     excel_file_path = '/root/code/MRIclass/datasets/SLN_WCH_final version_new.xlsx'   
 
-    data_loader = create_data_loader(source_directory, excel_file_path, batch_size=1, shuffle=True, num_workers=4)
+    data_loader = create_data_loader(source_directory, mask_directory, excel_file_path, batch_size=1, shuffle=True, num_workers=4)
     print(f"数据集大小: {len(data_loader.dataset)}")
 
     ii = 0
-    for batch_idx, (data, labels) in enumerate(data_loader):
+    for batch_idx, (data, mask, labels) in enumerate(data_loader):
         print(f"批次 {batch_idx+1}:")
         print(f" - 数据形状: {data.shape}")
         print(f" - 标签: {labels}")

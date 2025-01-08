@@ -9,8 +9,8 @@ def decompress_nii_gz(source_dir, destination_dir):
     item = 0
     for filename in os.listdir(source_dir):
         item += 1
-        if item < 700:
-            continue
+        if item >= 700:
+            break
         try:
             if filename.endswith('.nii.gz'):
                 source_file = os.path.join(source_dir, filename)
@@ -29,7 +29,7 @@ def decompress_nii_gz(source_dir, destination_dir):
     print(f"failed: {failed}")
 
 if __name__ == "__main__":
-    source_directory = '/root/code/MRIclass/datasets/SLN_internal_data/'
-    destination_directory = '/root/code/MRIclass/datasets/data/' 
+    source_directory = '/root/code/MRIclass/datasets/SLN_internal_mask/'
+    destination_directory = '/root/code/MRIclass/datasets/mask_/' 
     decompress_nii_gz(source_directory, destination_directory)
     

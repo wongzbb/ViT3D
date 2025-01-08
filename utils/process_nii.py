@@ -147,8 +147,8 @@ def process_nii_files(source_dir, destination_dir, min_width, min_height, min_sl
 
 def main():
     # 设置源文件夹和目标文件夹路径
-    source_directory = '/root/code/MRIclass/datasets/data/'          # 替换为您的源文件夹路径
-    destination_directory = '/root/code/MRIclass/datasets/data_crop_npy/'# 替换为您的目标文件夹路径
+    source_directory = '/root/code/MRIclass/datasets/mask_/'          # 替换为您的源文件夹路径
+    destination_directory = '/root/code/MRIclass/datasets/mask_npy/'# 替换为您的目标文件夹路径
 
     # 步骤1：找到最小尺寸
     min_width, min_height, min_slices = find_min_dimensions(source_directory)
