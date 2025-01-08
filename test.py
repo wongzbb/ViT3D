@@ -54,7 +54,6 @@ def main(config):
     # log
     logger.info(f"Loaded model from {config.sample_ckpt_path}")
 
-    model.eval()
     model = DDP(model.to(device), device_ids=[rank])
 
  
@@ -68,16 +67,16 @@ def main(config):
         shuffle=False, 
         sampler=sampler, 
         num_workers=config.num_workers, 
-        drop_last=False
+        drop_last=True
     ) # When using a DistributedSampler, you should set shuffle to False.
     if rank == 0:
         logger.info(f"Dataset contains {len(test_dataset)}.")
 
-    model.eval()  # important! This enables embedding dropout for classifier-free guidance
+    model.train()  # important! This enables embedding dropout for classifier-free guidance
 
 
-    auroc_metric = MulticlassAUROC(num_classes=2, average='none').to(device)
-    accuracy_metric = MulticlassAccuracy(num_classes=2, average='none').to(device)
+    auroc_metric = MulticlassAUROC(num_classes=2, average='macro').to(device)
+    accuracy_metric = MulticlassAccuracy(num_classes=2, average='macro').to(device)
     item = 0
     for slice3D_data in test_loader:
         item += 1
@@ -86,8 +85,12 @@ def main(config):
         x = slice3D_data[0].to(device, non_blocking=True)
         y = slice3D_data[1].to(device, non_blocking=True)
 
-        with torch.no_grad():
+        # with torch.no_grad():
+        with torch.inference_mode():
+        #     with torch.enable_grad():
             logits = model(x)
+
+
 
         # logits = F.softmax(logits, dim=-1)
 
@@ -96,6 +99,9 @@ def main(config):
         accuracy_metric.update(logits, y)
 
         logger.info(f"item: {item}, logits: {logits}, Labels: {y}")
+
+        # del logits
+        # torch.cuda.empty_cache()
 
     auroc_score = auroc_metric.compute()
     accuracy_score = accuracy_metric.compute()

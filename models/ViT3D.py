@@ -328,7 +328,7 @@ def ViT3D_S_4(**kwargs):
     return ViT3D(depth=12, hidden_size=384, patch_size=4, num_heads=6, **kwargs)
 
 def ViT3D_S_8(**kwargs):
-    return ViT3D(depth=22, hidden_size=384, patch_size=8, num_heads=6, **kwargs)
+    return ViT3D(depth=12, hidden_size=384, patch_size=8, num_heads=6, **kwargs)
 
 ViT3D_models = {
     'ViT3D-XL/2': ViT3D_XL_2,  'ViT3D-XL/4': ViT3D_XL_4,  'ViT3D-XL/8': ViT3D_XL_8,

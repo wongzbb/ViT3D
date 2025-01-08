@@ -13,6 +13,7 @@ from scipy.ndimage import rotate
 import torch.nn.functional as F
 import math
 from collections import defaultdict
+from einops import rearrange
 
 n_cpu = os.cpu_count()
 global_seed = 0
@@ -150,21 +151,24 @@ class NpyDataset(Dataset):
         if self.transform:
             data = self.transform(data)
 
-        subject = tio.Subject(
-            image=tio.ScalarImage(tensor=data)  # TorchIO expects (C, D, H, W)
-        )
+        # subject = tio.Subject(
+        #     image=tio.ScalarImage(tensor=data)  # TorchIO expects (C, D, H, W)
+        # )
         
-        augmented_data = subject.image.data.squeeze(0).numpy()  # 回到 (D, H, W)
-        augmented_data = torch.from_numpy(augmented_data).float()
+        # augmented_data = subject.image.data.squeeze(0).numpy()  # 回到 (D, H, W)
+        # augmented_data = torch.from_numpy(augmented_data).float()
 
-        # print(f"augmented_data.shape: {augmented_data.shape}")
-        augmented_data = augmented_data.unsqueeze(1)
-        # print(f"augmented_data.shape: {augmented_data.shape}")
+        # # print(f"augmented_data.shape: {augmented_data.shape}")
+        # augmented_data = augmented_data.unsqueeze(1)
+        # # print(f"augmented_data.shape: {augmented_data.shape}")
+
 
         label = torch.tensor(label).long() 
 
+        data = rearrange(data, 'c d h w -> d c h w')
 
-        return augmented_data[:self.num_frames,:,:,:], label
+        ll = (120 - self.num_frames) // 2
+        return data[ll:120-ll,:,:,:], label
 
     def normalize_data(self, data):
         data_min = np.min(data)

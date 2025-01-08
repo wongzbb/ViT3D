@@ -122,7 +122,7 @@ def main(config):
     else:
         train_dataset = NpyDataset(config.train_npy_dir, config.excel_path, transform=transform, num_frames=config.num_frames)
 
-
+    test_dataset = NpyDataset(config.test_npy_dir, config.excel_path, transform=transform, num_frames=config.num_frames)
     # targets_ = [sample[1] for sample in train_dataset]
     # class_counts = np.bincount(targets_) 
     # total_count = len(targets_)
@@ -141,6 +141,7 @@ def main(config):
     # )
 
     sampler=get_sampler(train_dataset)
+
     train_loader = DataLoader(
         train_dataset, 
         batch_size=int(config.global_batch_size // dist.get_world_size()), 
@@ -149,6 +150,7 @@ def main(config):
         num_workers=config.num_workers, 
         drop_last=True
     ) # When using a DistributedSampler, you should set shuffle to False.
+
     if rank == 0:
         logger.info(f"Dataset contains {len(train_dataset)}.")
 
@@ -170,7 +172,7 @@ def main(config):
     if rank == 0:
         logger.info(f"Training for {config.epochs} epochs...")
 
-    class_weights = torch.tensor([1.0, 4.0]).to(device)
+    # class_weights = torch.tensor([1.0, 4.0]).to(device)
 
     for epoch in range(config.epochs):
         sampler.set_epoch(epoch)
@@ -178,10 +180,10 @@ def main(config):
             logger.info(f"Beginning epoch {epoch}...")
 
         item = 0
-        for slice3D_data in train_loader:
+        for (x, y) in train_loader:
             item+=1
-            x = slice3D_data[0].to(device, non_blocking=True)
-            y = slice3D_data[1].to(device, non_blocking=True)
+            x = x.to(device)
+            y = y.to(device)
             # mask = slice3D_data['mask'].to(device, non_blocking=True)
 
             # print(x.shape)
@@ -201,7 +203,7 @@ def main(config):
                 y_one_hot = F.one_hot(y, num_classes=2).float()
                 total_loss = sigmoid_focal_loss(logits, y_one_hot, alpha=0.25, gamma=2, reduction='mean')
             else:
-                total_loss = F.cross_entropy(logits, y, weight=class_weights)
+                total_loss = F.cross_entropy(logits, y)
 
 
             # total_loss = sigmoid_focal_loss(logits, y_one_hot, alpha=0.75, gamma=10, reduction='mean')
@@ -249,7 +251,7 @@ def main(config):
                 avg_loss = avg_loss.item() / dist.get_world_size()
 
                 if rank == 0:
-                    logger.info(f"({epoch_isfinish:.1f}%) (step={train_steps:07d}) Train Loss: {avg_loss:.8f}, Train Steps/Sec: {steps_per_sec:.2f}")
+                    logger.info(f"({epoch_isfinish:.1f}%) (step={train_steps:07d}) Train Loss: {avg_loss:.8f}, Train Steps/Sec: {steps_per_sec:.2f}, logits: {logits}, Labels: {y}")
 
                 # Reset monitoring variables:
                 running_loss = 0
@@ -258,6 +260,15 @@ def main(config):
 
             # Save checkpoint:
             if train_steps % config.ckpt_every == 0 and train_steps > 0:
+                # # test
+                # for slice3D_data in train_loader:
+                #     x1 = slice3D_data[0].to(device, non_blocking=True)
+                #     y1 = slice3D_data[1].to(device, non_blocking=True)
+                #     logits = model(x1)
+                #     print(f"test logits: {logits}, Labels: {y1}")
+                #     del logits
+                #     torch.cuda.empty_cache()
+
                 if rank == 0:
                     checkpoint = {
                         "model": model.module.state_dict(),
