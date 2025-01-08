@@ -13,3 +13,4 @@ mask_npy/
 SLN_WCH_final version_new.xlsx
 load.py
 .codegpt
+data_loader_mask.py
