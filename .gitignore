@@ -1,6 +1,7 @@
 __pycache__/
 wandb/
 results/
+None/
 data/
 SLN_internal_data/
 SLN_internal_mask/
@@ -14,3 +15,5 @@ SLN_WCH_final version_new.xlsx
 load.py
 .codegpt
 data_loader_mask.py
+load.py
+*.txt
