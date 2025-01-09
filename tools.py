@@ -10,6 +10,8 @@ import os
 from torch import inf
 from typing import Union, Iterable
 _tensor_or_tensors = Union[torch.Tensor, Iterable[torch.Tensor]]
+from models import DINO_vit_small
+
 
 @torch.no_grad()
 def update_ema(ema_model, model, decay=0.9999):
@@ -93,3 +95,22 @@ def clip_grad_norm_(
         for g in grads:
             g.detach().mul_(clip_coef_clamped.to(g.device))
     return total_norm
+
+def load_dino_model(device, pretrained_path):
+    model = DINO_vit_small(
+            patch_size=8, num_classes=0
+        )
+    for p in model.parameters():
+        p.requires_grad = False
+    model.eval()
+    model.to(device)
+    state_dict = torch.load(pretrained_path, map_location="cpu")
+    state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+    state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
+    msg = model.load_state_dict(state_dict, strict=False)
+    print(
+        "Pretrained weights found at {} and loaded with msg: {}".format(
+            pretrained_path, msg
+        )
+    )
+    return model

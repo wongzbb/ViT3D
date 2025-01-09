@@ -1,11 +1,12 @@
 use_mask: True
 oversampled: True
+use_DINO: False
 
 global_seed: 25126
 global_batch_size: 2
 epochs: 1000
 results_dir: "results"
-lr: 0.0001
+lr: 5e-4 #5e-4
 weight_decay: 1e-5
 autocast: False
 model: "ViT3D-S/8"
@@ -17,8 +18,9 @@ num_frames: 200  #max 120
 img_size: 128
 
 #load from pretrain checkpoint
-init_from_pretrain_ckpt: False
-pretrain_ckpt_path: ""
+init_from_pretrain_ckpt: True
+pretrain_ckpt_path: "/root/code/MRIclass/results/003-ViT3D-S-8/checkpoints/0006000.pt"
+init_train_steps: 6000
 
 use_compiler: False
 
@@ -39,9 +41,14 @@ excel_path: '/root/code/MRIclass/datasets/SLN_WCH_final version_new.xlsx'
 
 sample_batch_size: 1
 sample_global_seed: 25126
-sample_ckpt_path: "/root/code/MRIclass/results/000-ViT3D-S-8/checkpoints/0025000.pt"
+sample_ckpt_path: "/root/code/MRIclass/results/013-ViT3D-S-8/checkpoints/0018000.pt"
 use_ema: False
 test_npy_dir: '/root/code/MRIclass/datasets/test/'  
 
 
 mask_dir: '/root/code/MRIclass/datasets/mask_npy/'
+
+DINO_ckpt_path: "/root/code/MedSora/dino_model/dino_vitbase8_pretrain_full_checkpoint.pth"
+DINO_selected_layers: [2, 5, 8, 11]  # 0 2 4 6 8 10
+
+DINO_loss_weight: 0.1

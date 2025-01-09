@@ -58,7 +58,7 @@ def main(config):
 
  
     transform = Resize4D(out_size=(config.img_size, config.img_size))
-    test_dataset = NpyDataset(config.test_npy_dir, config.excel_path, transform=transform, num_frames=config.num_frames)
+    test_dataset = NpyDataset(config.test_npy_dir, config.mask_dir, config.excel_path, transform=transform, num_frames=config.num_frames, use_mask=config.use_mask)
 
     sampler=get_sampler(test_dataset)
     test_loader = DataLoader(
@@ -82,17 +82,17 @@ def main(config):
     accuracy_metric1 = MulticlassAccuracy(num_classes=2, average='weighted').to(device)
 
     item = 0
-    for slice3D_data in test_loader:
+    for (x, y) in test_loader:
         item += 1
         # if item == 100:
         #     break
-        x = slice3D_data[0].to(device, non_blocking=True)
-        y = slice3D_data[1].to(device, non_blocking=True)
+        x = x.to(device, non_blocking=True)
+        y = y.to(device, non_blocking=True)
 
         # with torch.no_grad():
         with torch.inference_mode():
         #     with torch.enable_grad():
-            logits = model(x)
+            logits, _ = model(x)
 
 
 

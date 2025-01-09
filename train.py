@@ -17,13 +17,13 @@ from loguru import logger
 import os
 import wandb
 from torchvision.ops import sigmoid_focal_loss
-
+from torchmetrics.functional.regression import pearson_corrcoef
 
 from torch.cuda.amp import GradScaler, autocast
 from einops import rearrange
 from omegaconf import OmegaConf
 
-from tools import update_ema, find_model_ema, find_model_model, requires_grad, cleanup, create_logger, clip_grad_norm_
+from tools import update_ema, find_model_ema, find_model_model, requires_grad, cleanup, create_logger, clip_grad_norm_, load_dino_model
 
 from models import ViT3D_models
 
@@ -75,16 +75,28 @@ def main(config):
         logger = create_logger(None)
 
      # Create model:
-    model = ViT3D_models[config.model](
-        input_size=config.img_size,
-        in_channels=1,
-        num_frames=config.num_frames,
-        mlp_ratio=4.0,
-        class_dropout_prob=0.1,
-        num_classes=2,
-        learn_sigma=True,
-        attention_mode='math',  #xformers flash math
-    )
+    if config.use_DINO:
+        model = ViT3D_models[config.model](
+            input_size=config.img_size,
+            in_channels=1,
+            num_frames=config.num_frames//2,
+            mlp_ratio=4.0,
+            class_dropout_prob=0.1,
+            num_classes=2,
+            learn_sigma=True,
+            attention_mode='math',  #xformers flash math
+        )
+    else:
+        model = ViT3D_models[config.model](
+            input_size=config.img_size,
+            in_channels=1,
+            num_frames=config.num_frames,
+            mlp_ratio=4.0,
+            class_dropout_prob=0.1,
+            num_classes=2,
+            learn_sigma=True,
+            attention_mode='math',  #xformers flash math
+        )
 
     if config.init_from_pretrain_ckpt:
         #load model
@@ -92,7 +104,7 @@ def main(config):
         model.load_state_dict(model_state_dict_)
         #load ema
         ema = deepcopy(model).to(device)
-        ema_state_dict_ = find_model_model(config.pretrain_ckpt_path)
+        ema_state_dict_ = find_model_ema(config.pretrain_ckpt_path)
         ema.load_state_dict(ema_state_dict_)
         # log
         logger.info(f"Loaded pretrain model from {config.pretrain_ckpt_path}")
@@ -112,6 +124,10 @@ def main(config):
 
     
     opt = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+
+    # load DINO model
+    if config.use_DINO:
+        dino = load_dino_model(device=device, pretrained_path=config.DINO_ckpt_path)
 
 
     
@@ -167,23 +183,44 @@ def main(config):
             # print(x.shape)
 
             # print(x.shape)
+            if config.use_DINO:
+                mask = x[:,config.num_frames//2:,:,:,:]
+                x = x[:,:config.num_frames//2,:,:,:]
+                
 
             if config.autocast:
                 with autocast():
-                    logits = model(x)
+                    logits, layer_outputs = model(x)
             else:
-                logits = model(x)
-
-            # total_loss_dick = F.cross_entropy(logits, y)
-            # total_loss = total_loss_dick.mean()
-            # y_one_hot = F.one_hot(y, num_classes=2).float()
-            
+                logits, layer_outputs = model(x)
 
             if config.use_focal_loss:
                 y_one_hot = F.one_hot(y, num_classes=2).float()
                 total_loss = sigmoid_focal_loss(logits, y_one_hot, alpha=0.25, gamma=2, reduction='mean')
             else:
                 total_loss = F.cross_entropy(logits, y)
+
+            if config.use_DINO:
+                with torch.no_grad(): 
+                    attentions = dino.get_special_layers(rearrange(mask.repeat(1, 1, 3, 1, 1), 'b f c h w -> (b f) c h w').contiguous(), config.DINO_selected_layers)
+                    attentions = [item[:, 1:, :] for item in attentions]
+
+                DINO_loss = 0
+                k = 0
+                for i in config.DINO_selected_layers:
+                    layer_outputs_ = rearrange(layer_outputs[i], '(b f) l d -> b (f l d)', b = config.global_batch_size)
+                    attentions_ = rearrange(attentions[k], '(b f) l d -> b (f l d)', b = config.global_batch_size)
+
+                    pearson_loss_ = 0
+                    for j in range(config.global_batch_size):
+                        pearson_loss_ = 1 - pearson_corrcoef(layer_outputs_[j], attentions_[j])
+                    pearson_loss_ = pearson_loss_ / config.global_batch_size
+                    DINO_loss += pearson_loss_
+                    k += 1
+
+                # print(f"DINO_loss: {DINO_loss}")
+                total_loss += config.DINO_loss_weight * DINO_loss
+                    
 
 
             # total_loss = sigmoid_focal_loss(logits, y_one_hot, alpha=0.75, gamma=10, reduction='mean')
@@ -231,7 +268,10 @@ def main(config):
                 avg_loss = avg_loss.item() / dist.get_world_size()
 
                 if rank == 0:
-                    logger.info(f"({epoch_isfinish:.1f}%) (step={train_steps:07d}) Train Loss: {avg_loss:.8f}, Train Steps/Sec: {steps_per_sec:.2f}, logits: {logits}, Labels: {y}")
+                    if config.use_DINO:
+                        logger.info(f"({epoch_isfinish:.1f}%) (step={train_steps:07d}) Train Loss: {avg_loss:.8f}, DINO_loss: {DINO_loss:.8f},  Train Steps/Sec: {steps_per_sec:.2f}, logits: {logits}, Labels: {y}")
+                    else:
+                        logger.info(f"({epoch_isfinish:.1f}%) (step={train_steps:07d}) Train Loss: {avg_loss:.8f}, Train Steps/Sec: {steps_per_sec:.2f}, logits: {logits}, Labels: {y}")
 
                 # Reset monitoring variables:
                 running_loss = 0

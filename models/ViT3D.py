@@ -275,10 +275,15 @@ class ViT3D(nn.Module):
 
         #torch.Size([48, 1025, 384])
 
+        layer_outputs = []
+
         for i in range(0, len(self.blocks), 2):
             spatial_block, temp_block = self.blocks[i:i+2]
             
             x = spatial_block(x)
+
+            layer_outputs.append(x[:, 1:, :])
+
             x = rearrange(x, '(b f) t d -> (b t) f d', b=batches)
             # Add Time Embedding
             if i == 0:
@@ -287,10 +292,12 @@ class ViT3D(nn.Module):
             x = temp_block(x)
             x = rearrange(x, '(b t) f d -> (b f) t d', b=batches)
 
+            layer_outputs.append(x[:, 1:, :])
+
         x = x[:, 0]
         x = self.final_layer(x)               
         
-        return x
+        return x, layer_outputs
 
 
 
